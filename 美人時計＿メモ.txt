@@ -1,0 +1,370 @@
+「美人時計」をMS104SH4AGで作成する。　メモ
+
+「美人時計とは？」は、インターネットの説明HPに譲る。
+
+画像のダウンロードは、wget コマンドで取得出来るが、busyboxのwgetは、リファレンス指定ができないので、
+ソースコードを取得してメイクして作成する。
+（http://ftp.gnu.org/pub/gnu/wget/）
+
+# tar wget-***.tar.bz2
+# cd wget-***
+# ./configure CC=sh4-linux-gcc --host=sh4
+# make
+
+すると　wget***/src内にwgetが作成される。
+
+# wget -e HTTP_PROXY=192.168.***.***:8080 --referer=http://bijint.com/jp/ http://www.bijint.com/jp/img/clk/0101.jpg
+
+とすると、美人時計用の画像をダウンロードできる。
+連続取得するスクリプトは
+# for i in `seq 0 23`; do for j in `seq 0 59`; do /usr/local/bin/wget -e HTTP_PROXY=192.168.***.***:8080 --referer=http://bijint.com/jp/ http://www.bijint.com/jp/img/clk/`printf "%02d%02d" $i $j`.jpg; sleep 5; done; done;
+となる。
+
+C言語プログラム内で実行させるには、system()を使用する。
+
+  // 液晶に表示する画像をダウンロード（busyboxのwgetコマンドが指定されないようにパスを指定する。）
+  sprintf(command, "./wget -e HTTP_PROXY=192.168.10.249:8080 --referer=http://bijint.com/jp/ http://www.bijint.com/jp/img/clk/%02d%02d.jpg;", h, m);
+  system(command);
+
+実行画面
+--2011-01-07 13:23:01--  http://www.bijint.com/jp/img/clk/1323.jpg
+Connecting to 192.168.10.249:8080... connected.
+Proxy request sent, awaiting response... 200 OK
+Length: 102011 (100K) [image/jpeg]
+Saving to: `1323.jpg'
+
+100%[================================================>] 102,011      436K/s   in 0.2s
+
+2011-01-07 13:23:01 (436 KB/s) - `1323.jpg' saved [102011/102011]
+
+
+--------- CFルートファイルシステムの自動起動 ---------------------------------------
+
+=> setenv bootcmd ide res \; ext2load ide 0:1 84800000 /boot/uImage-ms104sh4ag \; bootm 84800000
+=> setenv bootargs console=ttySC0,38400 root=/dev/hda1
+=> saveenv
+=> reset
+
+-----------------------------------------------------------
+
+--------------------------------------------------------------------------
+時刻と表示する画像を合わせるには、時間を取得してファイル名に反映させる。
+
+  struct tm *s_time;	// システムタイム
+  time_t the_time;	// 起点（GMT 1970年1月1日0時)からの時間（エポックタイム）
+  char stime[10];	// 現在の時間（時分）
+
+
+  time(&the_time);	// エポックタイム取得
+  s_time=localtime(&the_time);	//ローカルタイムに変換
+  
+  sprintf(stime,"%02d%02d", s_time->tm_hour, s_time->tm_min);	//時分文字を作成
+
+
+美人画像の画像サイズは、５９０×４５０ピクセルで、液晶表示器の４８０×２７２と合わないので、
+縦横等倍になるように、３５７×２７２ピクセルに縮小して表示させている。
+
+ // LCDのサイズに合わせる
+ DFBRectangle resize={0,0,357,272};
+
+  //ロゴ画像を表示（画像をlogoにコピー）リサイズ指定
+  DFBCHECK (provider->RenderTo (provider, logo, &resize));
+
+
+
+ローカルタイムを表示するように指定
+# export TZ='JST-9'
+
+Linuxが起動時に反映するように設定
+# vi /etc/profile に
+export TZ='JST-9'　を追加しておく
+
+
+時間合わせ(手動）
+# date -s "2011-06-09 12:21"
+Thu Jun  9 12:21:00 JST 2011
+
+# hwclock --systohc
+
+# date
+Thu Jun  9 12:22:00 JST 2011
+
+
+時間合わせ(NTPサーバ）
+# /etc/init.d/S49ntp stop
+
+# ntpdate ntp.shikoku-pc.ac.jp
+# hwclock --systohc
+その後
+
+# cat /etc/ntp.conf
+server ntp.shikoku-pc.ac.jp
+
+# /etc/init.d/S49ntp start
+
+-------------------------------------------------------------------------------------------------
+自動起動・停止スクリプトの作成
+
+
+jpg_viewer とwget がPATHで指定されている場所にあるとする.
+buxyboxのwgetは使用できないので別名にするか削除する。
+# mkdir -p /usr/local/bin
+# cp jpg_viewer /usr/local/bin
+# cp wget /usr/local/bin
+# mv /usr/bin/wget /usr/bin/wget2
+
+
+文字表示用フォントのコピー
+# mkdir -p /usr/local/font
+# cp decker.ttf /usr/local/font
+
+# vi /etc/init.d/S90bijin
+
+viのオートインデントをしない指定
+:set noai
+
+----------------- S90bijin の内容(bijin_ALL3の場合）
+#! /bin/sh
+PATH=/usr/local/bin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+case "$1" in
+  start)
+        export TZ='JST-9'       #ローカルタイム（日本時間）
+        /etc/init.d/S90bijin stop
+
+        sleep 1
+
+        #jpg_viewer D HTTP_PROXY=192.168.10.249:8080 &  # 花嫁
+
+        #jpg_viewer HTTP_PROXY=192.168.10.249:8080 &    # ジャンル自動切り替え
+
+        #  時報ON
+        jpg_viewer HTTP_PROXY=192.168.10.249:8080 1 &   # ジャンル自動切り替え
+
+        #Localnet web server 
+        #jpg_viewer L & # 固定IPアドレスとし、DNSを指定する
+        
+        # SD Card
+        #jpg_viewer S &
+        ;;
+  stop)
+        flag=true
+        prog=jpg_viewer
+
+        while $flag
+        do
+                isAlive=`ps | grep $prog | grep -v grep | wc -l`
+                if [ $isAlive = 0 ]; then
+                        flag=false
+                else
+                        killall $prog
+                        sleep 1
+                fi
+        done
+        ;;
+  restart|force-reload)
+        /etc/init.d/S90bijin stop
+        sleep 1
+        /etc/init.d/S90bijin start
+        echo "."
+        ;;
+esac
+----------------------------------------------------------
+
+----------------- S90bijin_local の内容(bijin_sd3の場合）
+#! /bin/sh
+set -e
+PATH=/usr/local/bin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DEVICE=/dev/mmcblk0p1    # SDカードメモリのデバイス名
+MNT=/mnt/sd
+
+d_start() {
+        #mount $DEVICE $MNT
+        #sleep 10
+	export TZ='JST-9'	#ローカルタイム（日本時間）
+	d_stop
+
+        amixer cset numid=13 10         #スピーカボリュームを
+        sleep 1
+        mpg123 -a hw:0,1 -z $MNT/mp3/*.mp3 &     # シャッフル再生
+	sleep 10
+        jpg_viewer_sd &
+}
+d_stop() {
+        flag=true
+	prog=mpg123
+        while $flag
+        do
+                isAlive=`ps | grep $prog | grep -v grep | wc -l`
+                if [ $isAlive = 0 ]; then
+                        flag=false
+                else
+                        killall $prog
+                        sleep 1
+                fi
+        done
+
+        flag=true
+	prog=jpg_viewer_sd
+        while $flag
+        do
+                isAlive=`ps | grep $prog | grep -v grep | wc -l`
+                if [ $isAlive = 0 ]; then
+                        flag=false
+                else
+                        killall $prog
+                        sleep 1
+                fi
+        done
+        #umount $MNT
+}
+
+case "$1" in
+  start)
+        d_start
+        ;;
+  stop)
+        d_stop
+        ;;
+  restart|force-reload)
+        d_stop
+        sleep 1
+        d_start
+        echo "."
+        ;;
+esac
+
+----------------- S90bijin の内容
+
+----------------- net_bijin.sh の内容(bijin_net6の場合）
+#! /bin/sh
+PATH=/usr/local/bin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+case "$1" in
+  start)
+	export TZ='JST-9'	#ローカルタイム（日本時間）
+	/etc/init.d/S90bijin stop
+
+        jpg_viewer 3 HTTP_PROXY=192.168.10.249:8080 &
+        ;;
+  stop)
+        flag=true
+	prog=jpg_viewer
+        while $flag
+        do
+                isAlive=`ps | grep $prog | grep -v grep | wc -l`
+                if [ $isAlive = 0 ]; then
+                        flag=false
+                else
+                        killall $prog
+                        sleep 1
+                fi
+        done
+        ;;
+  restart|force-reload)
+        /etc/init.d/S90bijin stop
+        sleep 1
+        /etc/init.d/S90bijin start
+        echo "."
+        ;;
+esac
+----------------- net_bijin.sh の内容
+
+----------------- net_bijin.sh の内容(bijin_net7の場合）
+#! /bin/sh
+PATH=/usr/local/bin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+case "$1" in
+  start)
+	export TZ='JST-9'	#ローカルタイム（日本時間）
+        /etc/init.d/S90bijin stop
+
+        #jpg_viewer 3 HTTP_PROXY=192.168.10.249:8080 &	# サーキットガール
+
+        #jpg_viewer HTTP_PROXY=192.168.10.249:8080 &	# ジャンル自動切り替え
+
+	# 時報ON（音楽はS91music で用意しておく事）
+        jpg_viewer HTTP_PROXY=192.168.10.249:8080 1 &	# ジャンル自動切り替え
+        ;;
+  stop)
+        flag=true
+	prog=jpg_viewer
+        while $flag
+        do
+                isAlive=`ps | grep $prog | grep -v grep | wc -l`
+                if [ $isAlive = 0 ]; then
+                        flag=false
+                else
+                        killall $prog
+                        sleep 1
+                fi
+        done 
+        ;;
+  restart|force-reload)
+        /etc/init.d/S90bijin stop
+        sleep 1
+        /etc/init.d/S90bijin start
+        echo "."
+        echo "."
+        ;;
+esac
+----------------- net_bijin.sh の内容
+
+
+
+----------------- net_raidio.sh の内容
+
+#! /bin/sh
+
+d_start() {
+	d_stop
+
+	amixer cset numid=13 50		# スピーカボリューム(1 - 128)
+	sleep 1
+
+        #mpg123 -a hw:0,1 -z $MNT/mp3/*.mp3 &     # シャッフル再生(SD)
+        #mpg123 -a hw:0,1 -z /usr/local/mp3/*.mp3 &     # シャッフル再生(CF)
+
+        ## 以下インターネットサイトより
+
+#  /usr/local/bin/mpg123 -2 -a hw:0,1 -p 192.168.10.249:8080 http://u15bc.sky.fm:80/sky_uptemposmoothjazz &
+  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=496891&play_status=1 &
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1177953&play_status=1 &
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1339789&play_status=1 &
+# /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1268339&play_status=1 &
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 http://87.98.169.195:8000/ &
+}
+
+d_stop() {
+        flag=true
+	prog=mpg123
+
+        while $flag
+        do
+                isAlive=`ps | grep $prog | grep -v grep | wc -l`
+                if [ $isAlive = 0 ]; then
+                        flag=false
+                else
+                        killall $prog
+                        sleep 1
+                fi
+        done
+	sleep 1
+}
+
+case "$1" in
+  start)
+        d_start
+        ;;
+  stop)
+        d_stop
+        ;;
+  restart|force-reload)
+        d_stop
+        sleep 1
+        d_start
+        echo "."
+        ;;
+esac
+
+----------------- net_raidio.sh の内容

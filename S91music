@@ -1,0 +1,88 @@
+#! /bin/sh
+
+d_start() {
+	d_stop
+	
+	amixer cset numid=13 50
+	sleep 1
+
+# -------------- From CF --------------------------------
+# /usr/local/bin/mpg123 -a hw:0,1 -Z /usr/local/mp3/*.mp3 &
+
+#-------------- From Inter NetWork -----------------------------
+
+#DEFJAY.COM - 100% R&B! (USA/Europe)
+/usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=520036 &
+
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=496891&play_status=1 &
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1339789&play_status=1 &
+# /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1268339&play_status=1 &
+
+# TALK 89.3 KPCC - Southern California Public Radio
+# /usr/local/bin/mpg123 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=179361 &
+
+# Talk Alex Jones - Infowars.com
+# /usr/local/bin/mpg123 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1026951 &
+
+# Classical Minnesota Public Radio
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1377716 &
+
+# Vocal Trance - D I G I T A L L Y - I M P O R...
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1177953 &
+
+# Slow Radio (Love Songs & Easy Listening)
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1658657 &
+
+# 181.FM - Kickin' Country - Today's BEST Coun...
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1283687 &
+
+# 181.FM - The Buzz (Your Alternative Station!...
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1415249 &
+  
+# idobi Radio: New. Music. Unfiltered. idobi.c.
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=847066 &
+#  
+# The 1920s Radio Network, 20s, 30s, 40s, Old SWING JAZZ
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1237330 &
+
+# Absolutely Smooth Jazz - S K Y . F M
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=496891&play_status=1 &
+
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1177953&play_status=1 &
+
+#  SMOOTHJAZZ.COM - The Internet's Original Smo...
+#  /usr/local/bin/mpg123 -q -2 -a hw:0,1 -p 192.168.10.249:8080 -@ http://yp.shoutcast.com/sbin/tunein-station.pls?id=1339789&play_status=1 &
+
+}
+
+d_stop() {
+        flag=true
+	prog=mpg123
+
+        while $flag
+        do
+                isAlive=`ps | grep $prog | grep -v grep | wc -l`
+                if [ $isAlive = 0 ]; then
+                        flag=false
+                else
+                        killall $prog
+                fi
+        done
+	sleep 1        
+}
+
+case "$1" in
+  start)
+        d_start
+        ;;
+  stop)
+        d_stop
+        ;;
+  restart|force-reload)
+        d_stop
+        sleep 1
+        d_start
+        echo "."
+        ;;
+esac
+

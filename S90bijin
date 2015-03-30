@@ -1,0 +1,45 @@
+#! /bin/sh
+PATH=/usr/local/bin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+case "$1" in
+  start)
+        export TZ='JST-9'       #ローカルタイム（日本時間）
+        /etc/init.d/S90bijin stop
+
+        sleep 1
+
+        #jpg_viewer D HTTP_PROXY=192.168.10.249:8080 &  # 花嫁
+
+        #jpg_viewer HTTP_PROXY=192.168.10.249:8080 &    # ジャンル自動切り替え
+
+        #  時報ON
+        jpg_viewer HTTP_PROXY=192.168.10.249:8080 1 &   # ジャンル自動切り替え
+
+        #Localnet web server 
+        #jpg_viewer L & # 固定IPアドレスとし、DNSを指定する
+
+        # SD Card
+        #jpg_viewer S &
+        ;;
+  stop)
+        flag=true
+        prog=jpg_viewer
+
+        while $flag
+        do
+                isAlive=`ps | grep $prog | grep -v grep | wc -l`
+                if [ $isAlive = 0 ]; then
+                        flag=false
+                else
+                        killall $prog
+                        sleep 1
+                fi
+        done
+        ;;
+  restart|force-reload)
+        /etc/init.d/S90bijin stop
+        sleep 1
+        /etc/init.d/S90bijin start
+        echo "."
+        ;;
+esac
